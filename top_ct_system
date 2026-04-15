@@ -1,0 +1,43 @@
+module top_ct_system (
+    input  wire        clk,
+    input  wire        rst_n,
+    input  wire        start,
+    input  wire [15:0] data_in,
+    input  wire        data_valid,
+    output wire [15:0] pixel_out,
+    output wire        pixel_valid,
+    output wire        done
+);
+    wire [15:0] filtered_data;
+    wire        filtered_valid;
+    wire [15:0] backproj_data;
+    wire        backproj_valid;
+
+    fir_ramlak u_filter (
+        .clk        (clk),
+        .rst_n      (rst_n),
+        .data_in    (data_in),
+        .data_valid (data_valid),
+        .data_out   (filtered_data),
+        .out_valid  (filtered_valid)
+    );
+
+    back_projector u_backproj (
+        .clk        (clk),
+        .rst_n      (rst_n),
+        .data_in    (filtered_data),
+        .data_valid (filtered_valid),
+        .pixel_out  (backproj_data),
+        .pixel_valid(backproj_valid)
+    );
+
+    frame_buffer u_buffer (
+        .clk       (clk),
+        .rst_n     (rst_n),
+        .data_in   (backproj_data),
+        .wr_en     (backproj_valid),
+        .pixel_out (pixel_out),
+        .out_valid (pixel_valid),
+        .done      (done)
+    );
+endmodule
