@@ -1,0 +1,67 @@
+`timescale 1ns/1ps
+module tb_ct_system;
+
+    reg        clk = 0;
+    reg        rst_n;
+    reg        start;
+    reg [15:0] data_in;
+    reg        data_valid;
+    wire[15:0] pixel_out;
+    wire       pixel_valid;
+    wire       done;
+
+    always #5 clk = ~clk;
+
+    top_ct_system dut (
+        .clk        (clk),
+        .rst_n      (rst_n),
+        .start      (start),
+        .data_in    (data_in),
+        .data_valid (data_valid),
+        .pixel_out  (pixel_out),
+        .pixel_valid(pixel_valid),
+        .done       (done)
+    );
+
+    integer i;
+    initial begin
+        rst_n = 0; start = 0;
+        data_in = 0; data_valid = 0;
+
+        repeat(10) @(posedge clk);
+        rst_n = 1;
+        repeat(3)  @(posedge clk);
+
+        @(posedge clk); start = 1;
+        @(posedge clk); start = 0;
+
+        // Send 20 samples with clear values
+        for (i = 1; i <= 20; i = i+1) begin
+            @(posedge clk);
+            data_in    = i * 500;  // 500, 1000, 1500...
+            data_valid = 1;
+            $display("SEND sample=%0d data=%0d", i, i*500);
+        end
+
+        @(posedge clk);
+        data_valid = 0;
+        data_in    = 0;
+
+        // Wait long enough
+        repeat(1000) @(posedge clk);
+
+        $display("===================");
+        $display("done        = %b", done);
+        $display("pixel_out   = %d", pixel_out);
+        $display("pixel_valid = %b", pixel_valid);
+        $display("===================");
+        $finish;
+    end
+
+    always @(posedge clk) begin
+        if (pixel_valid)
+            $display(">>> pixel_out = %d at time %0t", pixel_out, $time);
+        if (done)
+            $display(">>> ✅ DONE at time %0t", $time);
+    end
+endmodule
