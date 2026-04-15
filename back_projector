@@ -1,0 +1,72 @@
+module back_projector #(
+    parameter IMG_SIZE   = 16,
+    parameter DATA_WIDTH = 16
+)(
+    input  wire                  clk,
+    input  wire                  rst_n,
+    input  wire [DATA_WIDTH-1:0] data_in,
+    input  wire                  data_valid,
+    output reg  [DATA_WIDTH-1:0] pixel_out,
+    output reg                   pixel_valid
+);
+    reg [DATA_WIDTH-1:0] accum [0:IMG_SIZE-1];
+    reg [4:0]  count;
+    reg [4:0]  px;
+    reg [1:0]  state;
+    integer    j;
+
+    localparam IDLE   = 2'd0,
+               ACCUM  = 2'd1,
+               OUTPUT = 2'd2,
+               WAIT   = 2'd3;
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            count       <= 0;
+            px          <= 0;
+            pixel_valid <= 0;
+            pixel_out   <= 0;
+            state       <= ACCUM;
+            for (j = 0; j < IMG_SIZE; j = j+1)
+                accum[j] <= 0;
+
+        end else begin
+            case (state)
+
+                ACCUM: begin
+                    pixel_valid <= 0;
+                    if (data_valid) begin
+                        accum[count] <= data_in + 16;
+                        if (count < IMG_SIZE - 1)
+                            count <= count + 1;
+                        else begin
+                            count <= 0;
+                            px    <= 0;
+                            state <= OUTPUT;
+                        end
+                    end
+                end
+
+                OUTPUT: begin
+                    // Output pixel, THEN check if last
+                    pixel_out   <= accum[px];
+                    pixel_valid <= 1;       // always 1 in OUTPUT state
+                    if (px < IMG_SIZE - 1)
+                        px <= px + 1;
+                    else begin
+                        state <= WAIT;      // go to WAIT before clearing valid
+                    end
+                end
+
+                WAIT: begin
+                    // One extra cycle to flush last pixel
+                    pixel_valid <= 0;
+                    px          <= 0;
+                    state       <= ACCUM;
+                end
+
+                default: state <= ACCUM;
+            endcase
+        end
+    end
+endmodule
